@@ -56,8 +56,7 @@ def movie_to_hdf5(fname, save_name = None, is_force = False):
         images._v_attrs['is_finished'] = 0
         
         desc = os.path.basename(fname)
-        for nn in tqdm.tqdm(range(mreader.number_of_frames), desc = desc):
-            header, img = mreader.read_frame(nn)
+        for nn, (header, img) in enumerate(tqdm.tqdm(mreader, desc = desc)):
             
             images[nn] = img
             headers.append(header)

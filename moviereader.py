@@ -10,7 +10,7 @@ import os
 import struct
 import math
 import numpy as np
-import tqdm
+
 #% A Matlab interface to the .movie binary files
 
 #conversion_dict = {'int32':'l', 'uint32':'L', 'uint64':'Q'}
@@ -185,12 +185,15 @@ class MovieReader():
         
         self._length_in_words = math.floor(self._image_bytes/ndiv);
     
-    def read_frame(self, frame_number):
+    
+        self.dtype = np.dtype('uint' + str(self._data_depth))
+        
+    def _read_frame(self, frame_number):
         offset = self._offset_header +  frame_number * (self._length_header + self._length_data);
         if self._data_depth == 12:
             raise ValueError('unimplemented')
         
-        img_dtype = np.dtype('uint' + str(self._data_depth))
+        
         #field_names, field_types = zip(*IIDC_header)
         #tot_read = sum(size_dict[x] for x in field_types)
         #assert self._length_header == tot_read
@@ -205,19 +208,31 @@ class MovieReader():
             #header = {k:x for k,x in zip(field_names, header_data)}
         
             
-            img = np.fromfile(fid, count = self._length_in_words, dtype=img_dtype)
+            img = np.fromfile(fid, count = self._length_in_words, dtype=self.dtype)
             img = img.reshape((self.height, self.width))
             np.ndarray.byteswap(img, inplace=True)
             
         return header, img
 
+    def __getitem__(self, index):
+        return self._read_frame(index)
+    
+    def __len__(self):
+        return self.number_of_frames
+    
+    def __iter__(self):
+        for nn in range(len(self)):
+            yield self[nn]
+    
+    
 if __name__ == '__main__':
+    import tqdm
     fname = '/Volumes/Ext1/Data/AnalysisFingers/08_12_15/roomT8_100_20/script_ramp.08Dec2015_18.45.08.movie'
     
     mreader = MovieReader(fname)
     
-    
-
+    for header, img in tqdm.tqdm(mreader):
+        pass
     
     
         
