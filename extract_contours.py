@@ -156,12 +156,12 @@ if __name__ == '__main__':
     is_invert = False
     dist_th = 20
     
-    #fname = '/Users/ajaver/OneDrive - Imperial College London/lucia/ramp100.29Oct2015_17.54.52.hdf5'
-    #d_ranges = ((800,1075), (190,400), (210,360)); dist_th = np.inf; last_trusty = 200;
+    fname = '/Users/avelinojaver/OneDrive - Imperial College London/lucia/ramp100.29Oct2015_17.54.52.hdf5'
+    d_ranges = ((800,1075), (190,400), (210,360)); dist_th = np.inf; last_trusty = 200;
     #d_ranges = ((800,1075), (200,400), (185,250))
     
-    fname = '/Users/ajaver/OneDrive - Imperial College London/lucia/ramp40.29Oct2015_18.00.24.hdf5'
-    d_ranges = ((1325,1900), (200,395), (250,360)); last_trusty = 450
+    #fname = '/Users/avelinojaver/OneDrive - Imperial College London/lucia/ramp40.29Oct2015_18.00.24.hdf5'
+    #d_ranges = ((1325,1900), (200,395), (250,360)); last_trusty = 450
     #d_ranges = ((1125,1700), (200,390), (150,270)); is_invert = True
     #d_ranges = ((0,1900), (175,425), (150,360))
     
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     plt.plot((last_trusty, last_trusty), ax2.get_ylim(), ':r', lw=3)
     
 #    plt.subplot(1,2,2)
-#    plt.plot(light_int/tot_pix)
+#    plt.plot(light_int/tot_pix)x
 #    plt.plot(dark_int/tot_pix)
 #    plt.plot(tot_int/tot_pix)
     
