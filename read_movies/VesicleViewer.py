@@ -1,4 +1,4 @@
-from HDF5VideoPlayer_ui import Ui_HDF5VideoPlayer
+from VesicleViewer_ui import Ui_VesicleViewer
 from moviereader import MovieReader
 
 import sys
@@ -375,7 +375,7 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
 
     def __init__(self, ui=None):
         if ui is None:
-            ui = Ui_HDF5VideoPlayer()
+            ui = Ui_VesicleViewer()
         
         super().__init__(ui)
 
@@ -473,6 +473,9 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
         self.label_height = dd.height()
         self.label_width = dd.width()
 
+        
+
+
         # equalize and cast if it is not uint8
         if not self.frame_img.dtype in (np.uint8, np.uint16):
             top = np.max(self.frame_img)
@@ -480,9 +483,14 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
         else:
             bot, top = self.intensity_slider.get_range()
 
+        if self.ui.checkBox_is_log.isChecked():
+            bot = np.log(bot + np.finfo(np.float32).eps) 
+            top = np.log(top + np.finfo(np.float32).eps)
+            self.frame_img = np.log(self.frame_img)
 
-        self.frame_img = (self.frame_img - bot) * 255. / (top - bot)
-        self.frame_img = np.clip(np.round(self.frame_img), 0, 255)
+        
+        self.frame_img = (self.frame_img.astype(np.float) - bot) / (top - bot)
+        self.frame_img = np.clip(np.round(self.frame_img* 255.), 0, 255)
         self.frame_img = self.frame_img.astype(np.uint8)
 
         self.frame_qimg = self._convert2Qimg(self.frame_img)
@@ -569,6 +577,8 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
         img = self.image_group[self.frame_number]
         self.intensity_slider.set_low_val(img.min())
         self.intensity_slider.set_hi_val(img.max())
+
+        self.ui.checkBox_is_log.stateChanged.connect(self.updateImage)
 
         self.updateImage()
 

@@ -210,7 +210,7 @@ class MovieReader():
             
             img = np.fromfile(fid, count = self._length_in_words, dtype=self.dtype)
             img = img.reshape((self.height, self.width))
-            np.ndarray.byteswap(img, inplace=True)
+            img.byteswap(inplace=True)
             
         return header, img
 
