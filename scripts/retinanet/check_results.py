@@ -13,7 +13,7 @@ sys.path.append(str(root_dir))
 
 
 from retinanet.flow import VesicleBBFlow, collate_fn
-from retinanet.models import RetinaNet, FocalLoss
+from retinanet.models import RetinaNet, FocalLoss, nms
 from retinanet.trainer import log_dir_root
 
 
@@ -21,43 +21,7 @@ import tqdm
 import torch
 from torch.utils.data import DataLoader
 #%%
-def nms(dets, scores, overlap_thresh):
-    """
-    greedily select boxes with high confidence and overlap with current maximum <= thresh
-    rule out overlap >= thresh
-    :param dets: [[x1, y1, x2, y2 score]]
-    :param thresh: retain overlap < thresh
-    :return: indexes to keep
-    """
-    if dets.shape[0] == 0:
-        return []
 
-    x1 = dets[:, 0]
-    y1 = dets[:, 1]
-    x2 = dets[:, 2]
-    y2 = dets[:, 3]
-    
-    areas = (x2 - x1 + 1) * (y2 - y1 + 1)
-    order = scores.argsort()[::-1]
-
-    keep = []
-    while order.size > 0:
-        i = order[0]
-        keep.append(i)
-        xx1 = np.maximum(x1[i], x1[order[1:]])
-        yy1 = np.maximum(y1[i], y1[order[1:]])
-        xx2 = np.minimum(x2[i], x2[order[1:]])
-        yy2 = np.minimum(y2[i], y2[order[1:]])
-
-        w = np.maximum(0.0, xx2 - xx1 + 1)
-        h = np.maximum(0.0, yy2 - yy1 + 1)
-        inter = w * h
-        ovr = inter / (areas[i] + areas[order[1:]] - inter)
-
-        inds = np.where(ovr <= overlap_thresh)[0]
-        order = order[inds + 1]
-
-    return keep
 #%%
 if __name__ == '__main__':
     batch_size = 1
@@ -66,12 +30,14 @@ if __name__ == '__main__':
     
     #model_bn = 'adam_20180905_180020_retinanet-resnet34_adam_lr1e-05_batch16' 
     
-    model_bn = 'adam_20180906_112815_retinanet-resnet34_clean_adam_lr0.0001_batch16'
+    #model_bn = 'adam_20180906_112815_retinanet-resnet34_clean_adam_lr0.0001_batch16'
     #model_bn = 'adam_20180906_111632_retinanet-resnet34_adam_lr0.0001_batch16'
+    
+    model_bn = 'adam_20180907_004840_retinanet-resnet50_adam_lr0.0001_batch16'
     backbone = model_bn.partition('retinanet-')[-1].partition('_')[0]
     
-    #model_path = log_dir_root / model_bn / 'model_best.pth.tar'
-    model_path = log_dir_root / model_bn / 'checkpoint.pth.tar'
+    model_path = log_dir_root / model_bn / 'model_best.pth.tar'
+    #model_path = log_dir_root / model_bn / 'checkpoint.pth.tar'
     
     
     
@@ -160,6 +126,7 @@ if __name__ == '__main__':
         
     tot_loss = tot_loss/n_batches
     #%%
+    import cv2
     img = X.squeeze().numpy()
 
     L = out_loc[:, 2:]-out_loc[:, :2]

@@ -9,32 +9,32 @@ import math
 import numpy as np
 
 def get_anchor_boxes(
-        crop_size = 256,
+        img_size = (256, 256),
         box_ini_scale = 2, #this value stablish how the size of the box to regress increases with the pyramid level
         pyramid_levels = [3, 4, 5, 6, 7],
         aspect_ratios = [(1.,1.)],#[(2.,1.), (1., 1.), (1.,2.)],   #here I am only using 1-1 ratio because I am using only circles in the dataset
         scales = [1., 2**(1/3), 2**(2/3)],
         ):
-    #%%
+    
     #boxes sizes, they do not have to match the cell receptive field. 
     #I choice this values because I am expecting an output of 256
     box_sizes = [int(box_ini_scale*(2 ** x)) for x in pyramid_levels]
     
     
-    grid_sizes = [int(math.ceil(crop_size/2**x)) for x in pyramid_levels]
+    grid_sizes = [[int(math.ceil(cc/2**x)) for cc in img_size] for x in pyramid_levels]
     strides = [2 ** x for x in pyramid_levels] #how the boxes will be shifted
     
     n_shapes = len(scales)*len(aspect_ratios)
     
     all_anchors = []
-    for grid_size, stride, box_size in zip(grid_sizes, strides, box_sizes):
+    for (grid_size_y, grid_size_x), stride, box_size in zip(grid_sizes, strides, box_sizes):
         anchors_shape = [(sc*arx*box_size,sc*ary*box_size) for (arx, ary) in aspect_ratios for sc in scales]
         
         anchors_shape = np.array(anchors_shape)
         
         
-        shift_x = (np.arange(0, grid_size) + 0.5) * stride
-        shift_y = (np.arange(0, grid_size) + 0.5) * stride
+        shift_x = (np.arange(0, grid_size_x) + 0.5) * stride
+        shift_y = (np.arange(0, grid_size_y) + 0.5) * stride
         shift_x, shift_y = np.meshgrid(shift_x, shift_y)
         anchor_coords = np.stack((shift_x.flatten(), shift_y.flatten()), axis=1)
         n_shifts = anchor_coords.shape[0]
@@ -46,7 +46,7 @@ def get_anchor_boxes(
         level_anchors = level_anchors.reshape(n_shifts, -1)
         
         all_anchors.append(level_anchors)
-        #%%
+        
     all_anchors = np.concatenate(all_anchors)
     all_anchors = all_anchors.reshape(-1, 4)
     
@@ -94,8 +94,8 @@ def get_jaccard_index(box_a,box_b):
     return jaccard  
 
 class BoxEncoder():
-    def __init__(self, crop_size):
-        self._anc_wh, self.n_anchors_shapes = get_anchor_boxes(crop_size)
+    def __init__(self, img_size):
+        self._anc_wh, self.n_anchors_shapes = get_anchor_boxes(img_size)
         self._anc_xy = wh2xy(self._anc_wh )
         
         #self._mean_coord = np.array([[0, 0, 0, 0]])

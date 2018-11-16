@@ -92,6 +92,7 @@ class CroppedFlow(Dataset):
 #%%
 if __name__ == '__main__':
     import tqdm
+    from torch.utils.data import DataLoader 
     gen = CroppedFlow()
     loader = DataLoader(gen, batch_size=8, shuffle=True)
     
@@ -101,3 +102,19 @@ if __name__ == '__main__':
     for X,Y in tqdm.tqdm(loader):
         tops.append(max(X.max().item(), Y.max().item()))
         bots.append(min(X.min().item(), Y.min().item()))
+        
+    
+        for x,y in zip(X,Y):
+            fig, axs = plt.subplots(1,2)
+            axs[0].imshow(x.squeeze(), cmap='gray')
+            axs[1].imshow(y.squeeze(), cmap='gray')
+            for ax in axs:
+                ax.axis('off')
+        break
+        
+    #%%
+    
+    
+    
+    
+        

@@ -119,7 +119,6 @@ class UNet(nn.Module):
         # the input shape must be divisible by 32 otherwise it will be cropped due 
         #to the way the upsampling in the network is done. Therefore it is better to path 
         #the image and recrop it to the original size
-        
         nn = 2**5
         ss = [math.ceil(x/nn)*nn - x for x in x_input.shape[2:]]
         pad_ = [(int(math.floor(x/2)),int(math.ceil(x/2))) for x in ss]

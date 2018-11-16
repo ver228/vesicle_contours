@@ -121,7 +121,7 @@ class VesicleBBFlow(Dataset):
             else:
                 self._test_indexes.append(img_id)
             
-        self.encoder = BoxEncoder(crop_size)
+        self.encoder = BoxEncoder((crop_size, crop_size))
         self.train()
         
         

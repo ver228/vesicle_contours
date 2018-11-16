@@ -6,10 +6,12 @@ import tables
 import os
 import numpy as np
 import copy
+import pandas as pd
 from functools import partial
 
 from PyQt5 import QtWidgets, QtCore, QtGui
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPointF
+from PyQt5.QtGui import QPainter, QFont, QPen, QPolygonF, QColor
 
 
 def setChildrenFocusPolicy(obj, policy):
@@ -31,7 +33,6 @@ class LineEditDragDrop():
         else:
             self.line_edit_obj = self.main_obj.lineEdit()
             
-
         self.main_obj.setAcceptDrops(True)
         self.main_obj.dragEnterEvent = self.dragEnterEvent
         self.main_obj.dropEvent = self.dropEvent
@@ -202,53 +203,85 @@ class SimplePlayer(QtWidgets.QMainWindow):
     def frame_step(self, value):
         return self.ui.spinBox_step.setValue(value)
 
+
 class IntensitySlider():
+    _slider_n_steps = 200
+
     def __init__(self, ui):
         self.spinBox_int_low = ui.spinBox_int_low
         self.spinBox_int_high = ui.spinBox_int_high
         self.horizontalSlider_int_low = ui.horizontalSlider_int_low
         self.horizontalSlider_int_high = ui.horizontalSlider_int_high
 
-        self.horizontalSlider_int_low.valueChanged.connect(self.spinBox_int_low.setValue)
-        self.spinBox_int_low.valueChanged.connect(self.horizontalSlider_int_low.setValue)
-        self.horizontalSlider_int_high.valueChanged.connect(self.spinBox_int_high.setValue)
-        self.spinBox_int_high.valueChanged.connect(self.horizontalSlider_int_high.setValue)
+        self.horizontalSlider_int_low.setMinimum(0)
+        self.horizontalSlider_int_high.setMinimum(0)
+        self.horizontalSlider_int_low.setMaximum(self._slider_n_steps)
+        self.horizontalSlider_int_high.setMaximum(self._slider_n_steps)
         
-        self.spinBox_int_high.valueChanged.connect(self.set_hi_val)
-        self.spinBox_int_low.valueChanged.connect(self.set_low_val)
+        self.link_spinbox_to_slide(self.spinBox_int_low, self.horizontalSlider_int_low, self._slider_n_steps)
+        self.link_spinbox_to_slide(self.spinBox_int_high, self.horizontalSlider_int_high, self._slider_n_steps)
 
+        self.bound_widgets(self.spinBox_int_low, self.spinBox_int_high)
+        self.bound_widgets(self.horizontalSlider_int_low, self.horizontalSlider_int_high)
+        
         self.set_range(0, 255, step = 1)
-        self.set_low_val(0)
-        self.set_hi_val(255)
+        
+    def link_spinbox_to_slide(self, spinbox, slider, slider_n_steps):
+        def _spinbox_changed(spinbox_val):
+            bot = spinbox.minimum()
+            top = spinbox.maximum()
+
+
+            ll = max((top-bot), 1)
+            slider_val = (spinbox_val-bot)/ll*slider_n_steps
+
+
+            slider.blockSignals(True)
+            slider.setValue(slider_val)
+            slider.blockSignals(False)
+
+        def _slider_changed(slider_val):
+            bot = spinbox.minimum()
+            top = spinbox.maximum()
+            spinbox_val = slider_val/slider_n_steps*(top-bot) + bot
+
+            spinbox.blockSignals(True)
+            spinbox.setValue(spinbox_val)
+            spinbox.blockSignals(False)
+
+        spinbox.valueChanged.connect(_spinbox_changed)
+        slider.valueChanged.connect(_slider_changed)
+
+    def bound_widgets(self, widget_low, widget_high):
+        def _bound_values(val=None):
+            low_val = widget_low.value()
+            hi_val = widget_high.value()
+            
+            if low_val >= hi_val:
+                widget_low.setValue(hi_val - self._step)
+            elif hi_val <= low_val:
+                widget_high.setValue(low_val + self._step)
+        
+        widget_high.valueChanged.connect(_bound_values)
+        widget_low.valueChanged.connect(_bound_values)
         
 
-    def set_hi_val(self, val):
-        low_val = self.spinBox_int_low.value()
-        self.spinBox_int_high.setValue(max(low_val + self._step, val))
-        self.spinBox_int_low.setValue(min(low_val , val))
 
-    def set_low_val(self, val):
-        hi_val = self.spinBox_int_high.value() 
-        self.spinBox_int_high.setValue(max(hi_val, val))
-        self.spinBox_int_low.setValue(min(hi_val - self._step, val))
 
-    def set_range(self, min_val, max_val, step = 1):
+    def set_range(self, min_val, max_val, step):
         self._step = step
 
-        self.horizontalSlider_int_low.setMaximum(max_val)
+        self.spinBox_int_low.setSingleStep(step)
+        self.spinBox_int_high.setSingleStep(step)
+        
         self.spinBox_int_low.setMaximum(max_val)
-        self.horizontalSlider_int_high.setMaximum(max_val)
         self.spinBox_int_high.setMaximum(max_val)
-    
-    
-        self.horizontalSlider_int_low.setMinimum(min_val)
+        
         self.spinBox_int_low.setMinimum(min_val)
-        self.horizontalSlider_int_high.setMinimum(min_val)
         self.spinBox_int_high.setMinimum(min_val)
 
-        self.set_low_val(min_val)
-        self.set_hi_val(max_val)
-
+        self.spinBox_int_high.setValue(max_val)
+        self.spinBox_int_low.setValue(min_val)
 
     def set_enable(self, val):
         self.spinBox_int_low.setEnabled(val)
@@ -260,6 +293,43 @@ class IntensitySlider():
         bot = self.spinBox_int_low.value()
         top = self.spinBox_int_high.value()
         return bot, top
+
+    def log_range(self, is_log):
+        cur_bot = self.spinBox_int_low.value()
+        cur_top = self.spinBox_int_high.value() 
+        bot, top = self.spinBox_int_low.minimum(), self.spinBox_int_high.maximum() 
+        
+        self.spinBox_int_low.blockSignals(True)
+        self.spinBox_int_high.blockSignals(True)
+        if is_log:
+            bot = np.log(bot + 1) 
+            top = np.log(top)
+
+            cur_bot = np.log(cur_bot + 1)
+            cur_top = np.log(cur_top)
+
+            self.set_range(bot, top, step = 0.01)
+            
+            
+        else:
+            bot = np.exp(bot)-1 
+            top = np.exp(top)
+
+            cur_bot = np.exp(cur_bot)-1
+            cur_top = np.exp(cur_top)
+
+            self.set_range(bot, top, step = 1)
+
+        cur_bot = max(bot, cur_bot)
+        cur_top = min(top, cur_top)
+
+
+        self.spinBox_int_low.blockSignals(False)
+        self.spinBox_int_high.blockSignals(False)
+
+        self.spinBox_int_low.setValue(cur_bot)
+        self.spinBox_int_high.setValue(cur_top)
+
 
 
 class HDF5Reader():
@@ -369,6 +439,71 @@ class JurijMovieReader():
         self.image_width = self.width
         self.frame_number = 0
 
+class ContourPlotter():
+    def __init__(self):
+        super().__init__()
+        self.frames_data = None
+        self.coords_data = None
+        self.cnt_per_frame = None
+        self.coord_per_cnt = None
+        self.traj_colors = {}
+
+    def load(self, fname):
+        self.traj_colors = {}
+        with pd.HDFStore(fname, 'r') as fid:
+            if '/contours_data' in fid:
+                self.frames_data = fid['/contours_data']
+                self.coords_data = fid['/contours_coordinates']
+            
+                self.cnt_per_frame = self.frames_data.groupby('frame_number').groups
+                self.coord_per_cnt = self.coords_data.groupby('contour_id').groups
+                
+            else:
+                self.frames_data = None
+                self.coords_data = None
+                self.cnt_per_frame = None
+                self.coord_per_cnt = None
+
+    def plot(self, frame_number, image):
+        if self.frames_data is None:
+            return
+
+        if not frame_number in self.cnt_per_frame:
+            return
+
+        painter = QPainter()
+        painter.begin(image)
+
+        penwidth = max(1, max(image.height(), image.width()) // 800)
+        pen = QPen()
+        pen.setWidth(penwidth)
+        
+        frame_data = self.frames_data.loc[self.cnt_per_frame[frame_number]]
+
+        for _, row in frame_data.iterrows():
+            interface_id = row['interface_id']
+            cnt_id = row['contour_id']
+
+            if not cnt_id in self.coord_per_cnt:
+                continue
+            
+            coords = self.coords_data.loc[self.coord_per_cnt[cnt_id]]
+            xx = coords['X']
+            yy = coords['Y']
+
+            if not interface_id in self.traj_colors:
+                self.traj_colors[interface_id] = QColor(*np.random.randint(50, 230, 3))
+            col = self.traj_colors[interface_id]
+
+            p = QPolygonF()
+            for x,y in zip(xx, yy):
+                p.append(QPointF(x,y))
+
+            pen.setColor(col)
+            painter.setPen(pen)
+            painter.drawPolyline(p)
+        
+        painter.end()
 
 
 class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
@@ -388,8 +523,11 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
         self.isPlay = False
         self.videos_dir = ''
         self.h5path = None
+        self.frame_raw = None
         self.frame_img = None
         self.frame_qimg = None
+
+        self.ctn_plotter = ContourPlotter()
 
         #default expected groups in the hdf5
         self.ui.comboBox_h5path.setItemText(0, "/mask")
@@ -416,7 +554,8 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
         self.intensity_slider = IntensitySlider(self.ui)
         self.ui.horizontalSlider_int_low.sliderReleased.connect(self.updateImage)
         self.ui.horizontalSlider_int_high.sliderReleased.connect(self.updateImage)
-        
+        self.ui.pushButton_autoscale.clicked.connect(self._autoscale)
+
         # setup image view as a zoom
         self.mainImage = ViewsWithZoom(self.ui.mainGraphicsView)
 
@@ -451,50 +590,54 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
         self.ui.imageSlider.setValue(self.frame_number)
         self.updateImage()
 
+
+
     # update image: get the next frame_number, and resize it to fix in the GUI
     # area
     def updateImage(self):
         self.readCurrentFrame()
+        self.ctn_plotter.plot(self.frame_number, self.frame_qimg)
         self.mainImage.setPixmap(self.frame_qimg)
+
+        
 
     def readCurrentFrame(self):
         if self.image_group is None:
             self.frame_qimg = None
             return
-        self.frame_img = self.image_group[self.frame_number]
+        self.frame_raw = self.image_group[self.frame_number]
+        if self.ui.checkBox_is_log.isChecked():
+            self.frame_raw = np.log(self.frame_raw + 1)
         self._normalizeImage()
         
 
     def _normalizeImage(self):
-        if self.frame_img is None:
+        if self.frame_raw is None:
             return 
 
         dd = self.ui.mainGraphicsView.size()
         self.label_height = dd.height()
         self.label_width = dd.width()
 
-        
+        bot, top = self.intensity_slider.get_range()
 
-
-        # equalize and cast if it is not uint8
-        if not self.frame_img.dtype in (np.uint8, np.uint16):
-            top = np.max(self.frame_img)
-            bot = np.min(self.frame_img)
-        else:
-            bot, top = self.intensity_slider.get_range()
-
-        if self.ui.checkBox_is_log.isChecked():
-            bot = np.log(bot + np.finfo(np.float32).eps) 
-            top = np.log(top + np.finfo(np.float32).eps)
-            self.frame_img = np.log(self.frame_img)
-
-        
-        self.frame_img = (self.frame_img.astype(np.float) - bot) / (top - bot)
+        self.frame_img = (self.frame_raw.astype(np.float) - bot) / (top - bot)
         self.frame_img = np.clip(np.round(self.frame_img* 255.), 0, 255)
         self.frame_img = self.frame_img.astype(np.uint8)
 
         self.frame_qimg = self._convert2Qimg(self.frame_img)
 
+
+    def _autoscale(self):
+        if self.frame_raw is None:
+            return
+
+        bot = np.min(self.frame_raw)
+        top = np.max(self.frame_raw)
+
+        self.intensity_slider.spinBox_int_low.setValue(bot) 
+        self.intensity_slider.spinBox_int_high.setValue(top) 
+        self.updateImage()
 
     def _convert2Qimg(self, img):
         qimg = QtGui.QImage(
@@ -532,6 +675,7 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
 
 
     def updateVideoFile(self, vfilename):
+
         # close the if there was another file opened before.
         if self.fid is not None:
             self.fid.close()
@@ -556,6 +700,8 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
             self.ui.pushButton_h5groups.setEnabled(False)
             JurijMovieReader._updateVideoFile(self, self.vfilename)
 
+        self.ctn_plotter.load(self.vfilename)
+
         self.ui.spinBox_frame.setMaximum(self.tot_frames - 1)
         self.ui.imageSlider.setMaximum(self.tot_frames - 1)
 
@@ -566,21 +712,21 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
 
 
         if self.image_group.dtype == np.uint8:
-            self.intensity_slider.set_range(0, 255)
+            self.intensity_slider.set_range(0, 255, 1)
         elif self.image_group.dtype == np.uint16:
-            self.intensity_slider.set_range(0, 2**16-1)
+            self.intensity_slider.set_range(0, 2**16-1, 1)
             
         else:
             #TODO Implement the intensity slider for non unit8 data. For the moment I deactivate this.
             self.intensity_slider.set_enable(False)
 
         img = self.image_group[self.frame_number]
-        self.intensity_slider.set_low_val(img.min())
-        self.intensity_slider.set_hi_val(img.max())
 
-        self.ui.checkBox_is_log.stateChanged.connect(self.updateImage)
-
+        self.ui.checkBox_is_log.toggled.connect(self.intensity_slider.log_range)
+        self.ui.checkBox_is_log.toggled.connect(self.updateImage)
+        
         self.updateImage()
+        self._autoscale()
 
 if __name__ == '__main__':
     print('hello!!')
