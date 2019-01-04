@@ -11,6 +11,7 @@ import numpy as np
 from skimage.transform import hough_circle, hough_circle_peaks
 from skimage.filters import threshold_otsu
 from skimage.morphology import disk
+
 import cv2
 import random
 from skimage.draw import circle_perimeter
@@ -78,15 +79,17 @@ def get_best_circles(mask, min_factor = 0.5,  max_factor=1.2, max_center_offset 
     
     return h_r
 #%%
+    
 if __name__ == '__main__':
     src_dir = Path.home() / 'workspace/Vesicles/segmented/'
     roi_files = list(src_dir.rglob('norm/*.png'))
     #%%
-    kernel = np.ones((3,3))
+    
     
     random.shuffle(roi_files)
     
     #%%
+    kernel = np.ones((3,3))
     for ii, roi_file in enumerate(roi_files):
         
         img = cv2.imread(str(roi_file), -1)
@@ -110,7 +113,7 @@ if __name__ == '__main__':
         top_acc = h_res[0][0]
         for acc, cx, cy, cr in h_res[0:2]:
             if acc > top_acc*0.9:
-                circ_cnt = np.stack([x[:, None] for x in circle_perimeter(cy, cx, int(cr*0.8))], axis=2)
+                circ_cnt = np.stack([x[:, None] for x in circle_perimeter(cy, cx, int(cr*0.9))], axis=2)
                 dd = np.zeros_like(borders)
                 cv2.drawContours(dd, [circ_cnt], -1, 255, -1)
                 mask_rs.append(dd)
@@ -120,33 +123,71 @@ if __name__ == '__main__':
         mask_intesect  = np.all(np.array(mask_rs), axis=0)
         
         
-        bb = int(round(min(img.shape)/16))
-        bb = bb if bb % 2 == 1 else bb + 1
-        mask_l = cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_MEAN_C,\
-                    cv2.THRESH_BINARY,bb, -2) > 0
+        
+        #bb = int(round(min(img.shape)/16))
+        #bb = bb if bb % 2 == 1 else bb + 1
+        #mask_l = cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_MEAN_C,\
+        #            cv2.THRESH_BINARY,bb, -2) > 0
         
         
-        th = threshold_otsu(img[(mask_intesect) & (mask_l==0)])*1.1
-        mask_l2 = img> th
+        sigma = img.shape[0]//2
+        k = sigma*2 + 1
         
-        valid_mask1 = (mask_l2) & (mask_union > 0)
-        valid_mask2 = (mask_l2) & (mask_intesect > 0)
+        img_s = img.astype(np.float32) - cv2.GaussianBlur(img, (k, k), sigma, sigma, borderType = cv2.BORDER_REFLECT_101)
+        
+        #mask_f = cv2.erode((mask_intesect).astype(np.uint8), kernel, iterations=5) > 0
+        mask_f = mask_intesect > 0
+        
+        bot, top = np.min(img_s), np.max(img_s)
+        img_s = (img_s - bot) / (top-bot)
+        
+        th = threshold_otsu(img_s[mask_f])#*1.1
+        valid_mask = (img_s > th) * mask_union
+                                       
+        #th = threshold_otsu(img[(mask_intesect) & (mask_l==0)])*1.1
+        #mask_l2 = img> th
+        
+        #valid_mask1 = (mask_l2) & (mask_union > 0)
+        #valid_mask2 = (mask_l2) & (mask_intesect > 0)
         
         
         
-        fig, axs = plt.subplots(1,3, figsize = (15, 5))
+        fig, axs = plt.subplots(1,3, figsize = (15, 5), sharex=True, sharey=True)
         axs[0].imshow(img)
-        axs[1].imshow(valid_mask1)
-        axs[2].imshow(valid_mask2)
+        axs[1].imshow(img_s)
+        axs[2].imshow(valid_mask)
         
-        
+        #axs[1].imshow(valid_mask1)
+        #axs[2].imshow(valid_mask2)
         
         for (acc, cx, cy, cr) in h_res[0:2]:
-            cpx,cpy = circle_perimeter(cy, cx, int(cr))
-            axs[0].plot(cpx,cpy, '.')
+            if acc > top_acc*0.9:
+                cpx,cpy = circle_perimeter(cy, cx, int(cr*0.9))
+                axs[0].plot(cpx,cpy, '.')
         
         
-        if ii > 10:
+        
+        
+        
+        
+        
+#        
+#        fig, axs = plt.subplots(1,3, sharex=True, sharey=True)
+#        axs = axs.flatten()
+#        axs[0].imshow(img)
+#        axs[1].imshow(dd)
+#        
+#        th = threshold_otsu(dd)
+#        axs[2].imshow(dd>th)
+        
+        #th2 = threshold_otsu(dd[dd<th])
+        #axs[3].imshow(dd>th2)
+        
+        if ii > 20:
             break
         
     #%%
+    
+    
+    #%%
+    

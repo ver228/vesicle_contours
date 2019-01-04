@@ -15,6 +15,7 @@ from PyQt5.QtGui import QPainter, QFont, QPen, QPolygonF, QColor
 
 
 def setChildrenFocusPolicy(obj, policy):
+    
     # recursively change the focus policy of all the objects in the widgets
     def recursiveSetChildFocusPolicy(parentQWidget):
         for childQWidget in parentQWidget.findChildren(QtWidgets.QWidget):
@@ -349,8 +350,8 @@ class HDF5Reader():
                 "The selected file is not a valid .hdf5. Please select a valid file",
                 QtWidgets.QMessageBox.Ok)
             return
+
         self.updateGroupNames()
-        self.getImGroup(0)
 
 
     def updateGroupNames(self):
@@ -359,11 +360,13 @@ class HDF5Reader():
 
         valid_groups = []
         for group in self.fid.walk_groups("/"):
+            print(group)
             for array in self.fid.list_nodes(group, classname='Array'):
                 if array.ndim == 3:
                     valid_groups.append(array._v_pathname)
 
-        if not valid_groups:
+
+        if not len(valid_groups):
             QtWidgets.QMessageBox.critical(
                 self,
                 '',
@@ -376,18 +379,23 @@ class HDF5Reader():
             return
 
         self.ui.comboBox_h5path.clear()
-        for kk in valid_groups:
+
+        imask = 0
+        for ii, kk in enumerate(valid_groups):
             self.ui.comboBox_h5path.addItem(kk)
-        self.getImGroup(0)
+            if kk == '/mask':
+                imask = ii
+
+        self.getImGroup(imask)
         self.updateImage()
 
     def getImGroup(self, index):
-        self.updateImGroup(self.ui.comboBox_h5path.itemText(index))
+        txt = self.ui.comboBox_h5path.itemText(index)
+        self.ui.comboBox_h5path.setCurrentIndex(index)
+        self.updateImGroup(txt)
 
     # read a valid groupset from the hdf5
     def updateImGroup(self, h5path):
-        
-
         #self.h5path = self.ui.comboBox_h5path.text()
         if h5path not in self.fid:
             self.mainImage.cleanCanvas()
@@ -590,16 +598,12 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
         self.ui.imageSlider.setValue(self.frame_number)
         self.updateImage()
 
-
-
     # update image: get the next frame_number, and resize it to fix in the GUI
     # area
     def updateImage(self):
         self.readCurrentFrame()
         self.ctn_plotter.plot(self.frame_number, self.frame_qimg)
         self.mainImage.setPixmap(self.frame_qimg)
-
-        
 
     def readCurrentFrame(self):
         if self.image_group is None:
@@ -685,6 +689,7 @@ class VideoPlayerGUI(SimplePlayer, HDF5Reader, JurijMovieReader):
         self.image_group = None
         self.h5path = None
         self.frame_number = 0
+        self.tot_frames = -1
 
         self.vfilename = vfilename
         self.ui.lineEdit_video.setText(self.vfilename)
